@@ -1,0 +1,83 @@
+{
+  "name": "dsh-web-fallback-chain",
+  "version": "0.2.0",
+  "description": "Ranked, cost-aware web search and fetch fallback chains for DeepSeek Harness: measured provider ranking, free-only mode, and one settings page.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "default": "./src/index.js"
+    },
+    "./client": "./src/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./icon.svg": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "src",
+    "locale",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "web-search",
+    "web-fetch",
+    "fallback",
+    "provider-chain",
+    "cost-aware"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "dsh": ">=0.2.2-0 <0.3.0-0"
+  },
+  "license": "MIT",
+  "author": "T-splines",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/T-splines/dsh-web-fallback-chain.git"
+  },
+  "homepage": "https://github.com/T-splines/dsh-web-fallback-chain#readme",
+  "bugs": {
+    "url": "https://github.com/T-splines/dsh-web-fallback-chain/issues"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-web": "^0.2.2-rc.1",
+    "@deepseek-ai/schemastery": ">=3.18.2 <4.0.0-0",
+    "@deepseek-ai/dsh-credentials": "^0.2.2-rc.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-credentials": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  },
+  "icon": "./icon.svg"
+}

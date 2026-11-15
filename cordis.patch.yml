@@ -1,0 +1,24 @@
+- insert:
+    - id: web-fallback
+      name: dsh-web-fallback-chain
+      config:
+        # Every field below is declared so the plugin resolves cleanly: a
+        # `volatile()` field that is absent from the config is read during schema
+        # resolution, before injection completes, and throws. Omit one and the
+        # plugin silently fails to register.
+        freeOnly: true
+        defaultMode: brief
+        order: []
+        searchOrder: []
+        modeOrders: {}
+        # 0 = 关闭：只看 HTTP 状态。曾经是 600，但它把 example.com（171 字真实正文）
+        # 判成失败，于是链绕到另一个档拿了 958 字的六语种重复内容——更长、更糟，
+        # 却看起来像成功。长度无法区分「页脚」和「合法短页面」。
+        minBodyChars: 0
+        annotateFallback: true
+        enable: []
+        providers: {}
+        timeoutMs: 30000
+        deepseekNeedContent: false
+        anysearchTag: ''
+        anysearchParams: ''
