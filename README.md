@@ -1,5 +1,7 @@
 # dsh-web-fallback-chain
 
+**English** | [简体中文](README.zh-CN.md)
+
 **One ranked, cost-aware chain for web search and fetch in DeepSeek Harness — measured quality, free-only mode, and a single settings page.**
 
 DSH's `ctx.web` selects exactly **one** provider per capability, and its config is a pinned

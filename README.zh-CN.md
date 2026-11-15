@@ -1,5 +1,7 @@
 # dsh-web-fallback-chain
 
+[English](README.md) | **简体中文**
+
 **给 DeepSeek Harness 的网页搜索与抓取提供一条按质量排序、带成本感知的回退链——实测排序、free-only 开关、一个设置页。**
 
 DSH 的 `ctx.web` 每个能力只能选**一个** provider，配置里写的是固定 id 而不是优先级列表，
