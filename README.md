@@ -86,7 +86,7 @@ An optional plain-HTTP leg (`http`) can be supplied by a separate web-fetch plug
 ### From npm
 
 ```bash
-dsh plugin --profile web add dsh-web-fallback-chain
+dsh plugin --profile web add @magic6/dsh-web-fallback-chain
 ```
 
 ### From source

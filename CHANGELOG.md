@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] - 2026-11-16
+
+### Changed
+
+- npm package renamed to `@magic6/dsh-web-fallback-chain`; npm requires a scoped
+  package for the first automated publish.
+- README: update the npm installation command.
+
 ## [0.2.2] - 2026-11-16
 
 ### Added

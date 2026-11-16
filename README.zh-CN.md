@@ -76,7 +76,7 @@ web_fetch  ──▶ fetch-chain  ──▶ anysearch ──▶ tavily ──▶
 ### 从 npm 安装
 
 ```bash
-dsh plugin --profile web add dsh-web-fallback-chain
+dsh plugin --profile web add @magic6/dsh-web-fallback-chain
 ```
 
 ### 从源码安装
