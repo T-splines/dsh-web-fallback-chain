@@ -1,6 +1,6 @@
 # dsh-web-fallback-chain
 
-[English](README.md) | **简体中文**
+[English](https://github.com/T-splines/dsh-web-fallback-chain/blob/main/README.md) | **简体中文**
 
 **给 DeepSeek Harness 的网页搜索与抓取提供一条按质量排序、带成本感知的回退链——实测排序、free-only 开关、一个设置页。**
 
@@ -72,6 +72,14 @@ web_fetch  ──▶ fetch-chain  ──▶ anysearch ──▶ tavily ──▶
 要求：DSH `0.2.2-rc.x`、Node.js 20+，以及 `DEEPSEEK_API_KEY`、`ANYSEARCH_API_KEY`、
 `TAVILY_API_KEY` 中**至少一个**。没有 key 的档仍会注册并自报不可用，所以一个 key 都没有
 时链里没有可调用的档。可选的普通 HTTP 档（`http`）需要另装 web-fetch 插件提供。
+
+### 从 npm 安装
+
+```bash
+dsh plugin --profile web add dsh-web-fallback-chain
+```
+
+### 从源码安装
 
 ```bash
 git clone https://github.com/T-splines/dsh-web-fallback-chain.git

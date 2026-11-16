@@ -1,6 +1,6 @@
 # dsh-web-fallback-chain
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [简体中文](https://github.com/T-splines/dsh-web-fallback-chain/blob/main/README.zh-CN.md)
 
 **One ranked, cost-aware chain for web search and fetch in DeepSeek Harness — measured quality, free-only mode, and a single settings page.**
 
@@ -82,6 +82,14 @@ Requirements: DSH `0.2.2-rc.x`, Node.js 20+, and **at least one** of
 `DEEPSEEK_API_KEY`, `ANYSEARCH_API_KEY`, `TAVILY_API_KEY`. A leg without its key is still
 registered but reports itself unavailable, so a chain with no keys has nothing to call.
 An optional plain-HTTP leg (`http`) can be supplied by a separate web-fetch plugin.
+
+### From npm
+
+```bash
+dsh plugin --profile web add dsh-web-fallback-chain
+```
+
+### From source
 
 ```bash
 git clone https://github.com/T-splines/dsh-web-fallback-chain.git

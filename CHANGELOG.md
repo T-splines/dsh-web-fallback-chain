@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-11-16
+
+### Added
+
+- npm distribution: install with `dsh plugin --profile web add dsh-web-fallback-chain`.
+
+### Changed
+
+- README: document npm installation and use absolute links for the language switch.
+
 ## [0.2.1] - 2026-11-16
 
 ### Changed
