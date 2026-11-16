@@ -98,7 +98,7 @@ profile 补丁里（`$DSH_HOME/profiles/<profile>/cordis.patch.yml`）：
 ```
 
 重新加载 profile（或重启 web app），打开 **插件 → 已安装插件 → 网页回退链
-（dsh-web-fallback-chain）**，设置卡片就在插件详情页上。如果 profile 里已经钉了别的
+（@magic6/dsh-web-fallback-chain）**，设置卡片就在插件详情页上。如果 profile 里已经钉了别的
 provider，把那些钉换掉即可。
 
 profile entry id 仍是 `web-fallback`。如果从旧包名 `dsh-web-fallback` 升级，请先卸载旧包；

@@ -109,7 +109,7 @@ bundle. Pin the chain providers in your profile patch
 ```
 
 Reload the profile (or restart the web app), then open **Plugins → Installed →
-dsh-web-fallback-chain**. The settings card is rendered on the plugin's detail page.
+@magic6/dsh-web-fallback-chain**. The settings card is rendered on the plugin's detail page.
 If your profile already pins another provider, replace those pins with the two ids above.
 
 The profile entry id stays `web-fallback`. If you are upgrading from the old package name
@@ -159,7 +159,7 @@ configuration to keep in sync.
 
 ## Settings page
 
-It lives on the plugin's detail page — **Plugins → Installed → dsh-web-fallback-chain** —
+It lives on the plugin's detail page — **Plugins → Installed → @magic6/dsh-web-fallback-chain** —
 not under Settings. The card has five primary controls, because every setting already has a
 measured default and none of them is something you must fill in:
 

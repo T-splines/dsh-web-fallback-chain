@@ -18,7 +18,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-web-fallback-chain',
+  id: '@magic6/dsh-web-fallback-chain',
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -128,9 +128,9 @@ window.__ModuleLoader__.load({
      *
      * Not the same string as `ENTRY_ID`: the settings namespace is the profile
      * entry's local id (`web-fallback`), while this slot is addressed by the package
-     * name the plugin manager reports (`dsh-web-fallback-chain`).
+     * name the plugin manager reports (`@magic6/dsh-web-fallback-chain`).
      */
-    const PACKAGE_NAME = 'dsh-web-fallback-chain';
+    const PACKAGE_NAME = '@magic6/dsh-web-fallback-chain';
 
     /**
      * The four read depths, duplicated here on purpose.

@@ -1,6 +1,6 @@
 - insert:
     - id: web-fallback
-      name: dsh-web-fallback-chain
+      name: '@magic6/dsh-web-fallback-chain'
       config:
         # Every field below is declared so the plugin resolves cleanly: a
         # `volatile()` field that is absent from the config is read during schema

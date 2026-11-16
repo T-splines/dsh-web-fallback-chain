@@ -277,7 +277,7 @@ function textOf(node, out = []) {
 
 test('the bundle loads through the module loader contract', () => {
   const { exports, seen } = loadClient()
-  assert.equal(seen.moduleId, 'dsh-web-fallback-chain')
+  assert.equal(seen.moduleId, '@magic6/dsh-web-fallback-chain')
   assert.equal(typeof exports.apply, 'function')
   // `remote.credentials` is a hard dependency: without it the page cannot say whether
   // a key is set. The official web-search page declares it for the same reason.
@@ -301,7 +301,7 @@ test('apply registers into plugins.bundle.config, keyed by package name', () => 
   assert.equal(config.name, 'plugins.bundle.config')
   // `key` (the package name), not `id` (the settings namespace): the manager pairs
   // the card with a row by package name, so the wrong field would mount nothing.
-  assert.equal(config.key, 'dsh-web-fallback-chain')
+  assert.equal(config.key, '@magic6/dsh-web-fallback-chain')
   assert.equal(config.id, undefined)
   assert.equal(typeof config.inject, 'function')
 })
