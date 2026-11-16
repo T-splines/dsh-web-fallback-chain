@@ -1,95 +1,85 @@
 # dsh-web-fallback-chain
 
-**English** | [简体中文](https://github.com/T-splines/dsh-web-fallback-chain/blob/main/README.zh-CN.md)
+[English](https://github.com/T-splines/dsh-web-fallback-chain/blob/main/README.en.md) | **简体中文**
 
-**One ranked, cost-aware chain for web search and fetch in DeepSeek Harness — measured quality, free-only mode, and a single settings page.**
+**给 DeepSeek Harness 的网页搜索与抓取提供一条按质量排序、带成本感知的回退链——实测排序、free-only 开关、一个设置页。**
 
-DSH's `ctx.web` selects exactly **one** provider per capability, and its config is a pinned
-provider id rather than a priority list. "Best first, something free when the best fails"
-cannot be expressed in a profile. This plugin registers one provider per capability whose
-internal order *is* that list — and ships the individual legs so you can pin any of them
-directly.
+DSH 的 `ctx.web` 每个能力只能选**一个** provider，配置里写的是固定 id 而不是优先级列表，
+所以「先试最好的，失败后自动退到免费的」无法在 profile 里表达。本插件为每个能力注册一个
+provider，其内部顺序就是那张优先级列表；同时把每个独立档位也注册出来，想单钉哪一个都可以。
 
-- [Why this exists](#why-this-exists)
-- [What makes it different](#what-makes-it-different)
-- [What it registers](#what-it-registers)
-- [Install](#install)
-- [Ranking](#ranking)
-- [The free-only switch](#the-free-only-switch)
-- [Settings page](#settings-page)
-- [Configuration](#configuration)
-- [Why one package and not four](#why-one-package-and-not-four)
-- [Tests](#tests)
-- [Compatibility](#compatibility)
+- [为什么需要它](#为什么需要它)
+- [差异点](#差异点)
+- [注册了什么](#注册了什么)
+- [安装](#安装)
+- [默认排序](#默认排序)
+- [free-only 开关](#free-only-开关)
+- [设置页](#设置页)
+- [配置](#配置)
+- [为什么是一个包而不是四个](#为什么是一个包而不是四个)
+- [测试](#测试)
+- [兼容性](#兼容性)
 
-## Why this exists
+## 为什么需要它
 
-A DSH profile can say *which* web provider to use, but not *in what order to try several*.
-When the primary search or fetch fails, the request fails; there is no "try the free leg
-next" seam. Rebuilding that seam in every deployment means four packages, four settings
-pages, and a lockstep upgrade problem.
+DSH profile 能指定「用哪个网页 provider」，但不能指定「按什么顺序试多个」。主搜索或抓取
+失败时请求就失败，没有「再试下一个免费档」的接缝。若在每个部署里各写一遍，就会变成四个包、
+四个设置页，以及升级时必须同步改的锁步问题。
 
-This plugin puts the ordered chain back into the provider slot:
+本插件把有序链放回 provider 槽位：
 
 ```
 web_search ──▶ search-chain ──▶ deepseek-search-rich ──▶ anysearch ──▶ tavily
 web_fetch  ──▶ fetch-chain  ──▶ anysearch ──▶ tavily ──▶ deepseek-fetch-rich ──▶ http*
 ```
 
-`http*` is an optional plain-HTTP leg supplied by the deployment (for example a separate
-web-fetch plugin); this package does not register it. The first **available** leg serves
-each request; the rest are attempted only when it fails or returns too little. The order is
-a quality ranking, not a cost ranking. With the default `freeOnly: true`, paid legs are
-skipped at call time, so the first available leg is the first *free* one.
+`http*` 是可选的普通 HTTP 档，由部署方另行提供（例如另一个 web-fetch 插件）；本包
+**不注册**它。链首的**可用**档服务每个请求；其余档只在它失败或返回内容太少时才尝试。
+顺序按「返回质量」排，不是按「尝试成本」排。默认 `freeOnly: true` 时付费档在调用时被
+跳过，所以实际链首是第一个免费可用档。
 
-## What makes it different
+## 差异点
 
-- **Measured, not guessed.** Defaults come from this plugin's own benchmark: blind-scored
-  fetches on 15 pages, blind-scored search relevance on 10 queries, and 20-site availability
-  runs. The numbers are a starting point you can reorder, not a promise about any page.
-- **Free-only actually skips paid legs.** `freeOnly` is checked at call time. Turning it off
-  restores the *same* order instead of maintaining a second list.
-- **One package, one settings page.** Reorder legs with ▲▼, toggle free-only, annotate which
-  leg served a fallback, and switch read mode. No second config to keep in sync.
-- **Honest fallback.** The chain returns lossless JSON, can write the serving leg into the
-  output, and does not treat a short page as a failure unless you opt in
-  (`minBodyChars` defaults to 0).
-- **Provider-specific value.** DeepSeek search maps the `summary` field (600–800 chars), not
-  just a snippet; AnySearch is the leg that got through bot walls in testing; Tavily is the
-  free leg that extracts PDFs.
-- **Tested where it matters.** 162 `node --test` cases, including the real settings client
-  rendered through `vm` with a fake module loader, and round-trip tests for every
-  registered settings field.
+- **实测排序，不是拍脑袋。** 默认顺序来自本插件自己的 benchmark：15 个页面盲评抓取质量、
+  10 条查询盲评搜索相关性、20 个站点的可用性测试。数字是起点，不是对某个页面的承诺。
+- **free-only 真的会跳过付费档。** `freeOnly` 在**调用时**判断；关闭后恢复的是**同一份**
+  顺序，而不是另外维护一张表。
+- **一个包、一个设置页。** ▲▼ 调整档位、切换 free-only、标注回退来源、切换读取模式；
+  没有第二份配置需要同步。
+- **诚实的回退。** 链结果是无损 JSON，可以把实际服务的档位写进输出；短正文默认不算失败
+  （`minBodyChars` 默认 0），需要时再开启长度门槛。
+- **每个 provider 都有明确价值。** DeepSeek 搜索映射 `summary`（600–800 字）而不只是
+  snippet；AnySearch 是实测能穿过 bot 墙的档位；Tavily 是免费档里能抽取 PDF 的那个。
+- **在关键位置有测试。** 162 个 `node --test` 用例，包括用 `vm` + 假模块加载器渲染真实设置页，
+  以及每个设置字段的往返测试。
 
-## What it registers
+## 注册了什么
 
-| id | capability | what it is |
+| id | 能力 | 说明 |
 |:--|:--|:--|
-| `search-chain` | search | the ordered search chain (pin `searchProvider` to this) |
-| `fetch-chain` | fetch | the ordered fetch chain (pin `fetchProvider` to this) |
-| `deepseek-search-rich` | search | DeepSeek search, mapping `summary` (600–800 chars) not just `snippet` |
-| `deepseek-fetch-rich` | fetch | DeepSeek fetch |
-| `anysearch` | search + fetch | AnySearch; the only leg that got through bot walls in testing |
-| `tavily` | search + fetch | Tavily; the only free leg here that extracts PDFs |
+| `search-chain` | search | 有序搜索链（把 `searchProvider` 钉到它） |
+| `fetch-chain` | fetch | 有序抓取链（把 `fetchProvider` 钉到它） |
+| `deepseek-search-rich` | search | DeepSeek 搜索，映射 `summary`（600–800 字） |
+| `deepseek-fetch-rich` | fetch | DeepSeek 抓取 |
+| `anysearch` | search + fetch | AnySearch；实测唯一能穿过 bot 墙的档位 |
+| `tavily` | search + fetch | Tavily；免费档里唯一能抽取 PDF 的 |
 
-`http` is intentionally **not** in this table: it is a deployment-supplied leg, not part of
-this package. The chains can name it, and a fetch that falls through to it will use it when
-another plugin registers that id.
+`http` 故意**不在**这张表里：它由部署方提供，不属于本包。链里可以点名它；当另一个插件
+注册了该 id 时，抓取链退到它就会使用它。
 
-## Install
+## 安装
 
-Requirements: DSH `0.2.2-rc.x`, Node.js 20+, and **at least one** of
-`DEEPSEEK_API_KEY`, `ANYSEARCH_API_KEY`, `TAVILY_API_KEY`. A leg without its key is still
-registered but reports itself unavailable, so a chain with no keys has nothing to call.
-An optional plain-HTTP leg (`http`) can be supplied by a separate web-fetch plugin.
+要求：DSH `0.2.2-rc.x`、Node.js 20+，以及 `DEEPSEEK_API_KEY`、`ANYSEARCH_API_KEY`、
+`TAVILY_API_KEY` 中**至少一个**。没有 key 的档仍会注册并自报不可用，所以一个 key 都没有
+时链里没有可调用的档。可选的普通 HTTP 档（`http`）需要另装 web-fetch 插件提供。
 
-### From npm
+### 从 npm 安装
 
 ```bash
 dsh plugin --profile web add @magic6/dsh-web-fallback-chain
 ```
 
-### From source
+### 从源码安装
 
 ```bash
 git clone https://github.com/T-splines/dsh-web-fallback-chain.git
@@ -97,9 +87,8 @@ cd dsh-web-fallback-chain
 dsh plugin --profile web add "$PWD"
 ```
 
-The package is a bundle (`dsh.bundle.patch`), so its default entry is mounted by the
-bundle. Pin the chain providers in your profile patch
-(`$DSH_HOME/profiles/<profile>/cordis.patch.yml`):
+包本身是一个 bundle（`dsh.bundle.patch`），默认 entry 由 bundle 挂载。把链 provider 钉到
+profile 补丁里（`$DSH_HOME/profiles/<profile>/cordis.patch.yml`）：
 
 ```yaml
 - id: web
@@ -108,139 +97,117 @@ bundle. Pin the chain providers in your profile patch
     fetchProvider: fetch-chain
 ```
 
-Reload the profile (or restart the web app), then open **Plugins → Installed →
-@magic6/dsh-web-fallback-chain**. The settings card is rendered on the plugin's detail page.
-If your profile already pins another provider, replace those pins with the two ids above.
+重新加载 profile（或重启 web app），打开 **插件 → 已安装插件 → 网页回退链
+（@magic6/dsh-web-fallback-chain）**，设置卡片就在插件详情页上。如果 profile 里已经钉了别的
+provider，把那些钉换掉即可。
 
-The profile entry id stays `web-fallback`. If you are upgrading from the old package name
-`dsh-web-fallback`, remove the old package first; installing both would mount the same entry
-twice. Existing settings keep working because the entry id did not change.
+profile entry id 仍是 `web-fallback`。如果从旧包名 `dsh-web-fallback` 升级，请先卸载旧包；
+两个都装会把同一个 entry 挂载两次。entry id 没变，原有设置继续有效。
 
-To verify the composition without starting an agent:
+不启动 agent 验证组合树：
 
 ```bash
 dsh --profile web --dump-config | grep -A6 'id: web-fallback'
 ```
 
-## Ranking
+## 默认排序
 
-Defaults are **strictly by measured quality, descending**, identical for every read mode:
+默认**严格按实测质量降序**，所有读取模式一致：
 
-| leg | quality | cost | key |
+| 档位 | 质量 | 成本 | key |
 |:--|:--|:--|:--|
-| `deepseek-search-rich` | 9.6 | paid | `DEEPSEEK_API_KEY` |
-| `anysearch` | 7.3 | free | `ANYSEARCH_API_KEY` |
-| `tavily` | 7.3 | free | `TAVILY_API_KEY` |
-| `deepseek-fetch-rich` | 5.4 | paid | `DEEPSEEK_API_KEY` |
-| `http` | 4.0 | free | — (external leg, not shipped) |
+| `deepseek-search-rich` | 9.6 | 付费 | `DEEPSEEK_API_KEY` |
+| `anysearch` | 7.3 | 免费 | `ANYSEARCH_API_KEY` |
+| `tavily` | 7.3 | 免费 | `TAVILY_API_KEY` |
+| `deepseek-fetch-rich` | 5.4 | 付费 | `DEEPSEEK_API_KEY` |
+| `http` | 4.0 | 免费 | —（外部档，不由本包提供） |
 
-Search order: `deepseek-search-rich → anysearch → tavily`.
-Fetch order: `anysearch → tavily → deepseek-fetch-rich → http` (the last one only when an
-external web-fetch plugin registers it).
+搜索顺序：`deepseek-search-rich → anysearch → tavily`。
+抓取顺序：`anysearch → tavily → deepseek-fetch-rich → http`（最后一档只有外部
+web-fetch 插件注册时才存在）。
 
-`quality` is for ordering only — it is not a promise about a particular page. The numbers
-come from the plugin's own benchmark; your corpus may rank differently. Reorder the ladders
-on the settings page and the plugin writes the flat `order` / `searchOrder` list.
+`quality` 只用于排序，不是对某个页面的承诺；数字来自本插件自己的 benchmark，你的语料可能
+排序不同。设置页调整后写入扁平的 `order` / `searchOrder`，对所有模式同时生效。
 
-**First available means primary.** The first leg whose key is present and that is not
-skipped by `freeOnly` serves the request; the rest are tried only when it fails or returns
-too little. The list is ordered by "how good is what comes back", not by "how cheap is the
-attempt".
+## free-only 开关
 
-## The free-only switch
+`freeOnly`（默认**开启**）在**调用时**跳过所有标记为 `paid` 的档位。它**不重排**：排序只有
+一份，关闭开关后恢复同一序列。设置页把付费档灰显而不是隐藏，所以显示顺序始终等于存储顺序。
 
-`freeOnly` (default **on**) skips every leg marked `paid` **at call time**. It does not
-reorder anything: the ranking is one list, and turning the switch off restores the same
-sequence. The settings page shows billed legs greyed out rather than hiding them, so the
-displayed list always matches the stored one.
+## 设置页
 
-Reading only `process.env` and skipping paid legs is the whole of it — there is no second
-configuration to keep in sync.
+设置页在插件详情页上——**插件 → 已安装插件 → 网页回退链**——不在「设置」里。
+卡片只有五个主要控件，因为每个设置都有实测默认值，没有一个是必须填的：
 
-## Settings page
+- 两个开关：`freeOnly`、`annotateFallback`
+- 一个选择：`defaultMode`（`brief` / `deep` / `list` / `page`）
+- 两个 ▲▼ 阶梯：搜索链、抓取链
 
-It lives on the plugin's detail page — **Plugins → Installed → @magic6/dsh-web-fallback-chain** —
-not under Settings. The card has five primary controls, because every setting already has a
-measured default and none of them is something you must fill in:
+卡片里还有一个**高级**区，放的是比较可能调整的设置：`minBodyChars`、`timeoutMs`、
+`enable` 白名单（以挂载勾选框呈现）、每档 `cost`、`deepseekNeedContent`、
+`anysearchTag`，以及三个 API key。
 
-- two switches — `freeOnly`, `annotateFallback`
-- one choice — `defaultMode` (`brief` / `deep` / `list` / `page`)
-- two ladders with ▲▼ to reorder a leg
+## 配置
 
-There is also an **Advanced** section for the settings you are more likely to touch:
-`minBodyChars`, `timeoutMs`, the `enable` allow-list (as mount checkboxes), per-leg
-`cost`, `deepseekNeedContent`, `anysearchTag`, and the three API keys.
+下表是完整字段参考，包括少数只能写补丁的字段：
 
-## Configuration
-
-The table below is the full field reference, including the few fields that remain
-patch-only:
-
-| field | where | meaning |
+| 字段 | 位置 | 含义 |
 |:--|:--|:--|
-| `minBodyChars` | Advanced | **Default 0 (off): HTTP status alone decides.** When set, a shorter body counts as a miss and the chain continues. A length floor cannot separate a site footer (142–332 chars) from a legitimately short page: `example.com` has 171 characters of real content. |
-| `timeoutMs` | Advanced | per-leg timeout. Default 30000. |
-| `order` / `searchOrder` | ▲▼ arrows | the flat ladder per capability. Covers every mode at once and takes precedence over the shipped per-mode defaults. |
-| `modeOrders` | patch only | per-capability, per-mode override: `{ fetch: { deep: [...] } }`. Only set this to make one mode behave differently; an uncovered mode falls back to `order`. If `order` is empty too, the shipped per-mode defaults apply — that is how the no-config default works. |
-| `enable` | Advanced | an **allow-list** of legs this plugin registers. **Empty means all.** Use it to keep a provider from ever being called — e.g. leaving a billed leg out so it is unreachable even with free-only off. |
-| `providers` | Advanced (cost) / patch (rest) | per-leg metadata overrides: `cost` (what `freeOnly` reads), `maxChars` (per-mode budget), `requiresKey`, `kinds`, `note`. `quality` is documentation only; runtime ordering comes from `order` / `modeOrders`. |
-| `deepseekNeedContent` | Advanced | DeepSeek search full-text. Billed per call either way; the response grows from ~5 KB to ~45 KB. |
-| `anysearchTag` | Advanced | vertical routing, e.g. `code.doc`. It changes query semantics, not ranking. |
-| `anysearchParams` | patch only | extra AnySearch query parameters, passed through as-is. |
+| `minBodyChars` | 高级 | **默认 0（关闭）：只看 HTTP 状态。** 设置后，短正文算未命中并继续链。长度门槛分不清页脚（142–332 字）和合法短页面：`example.com` 有 171 字真实正文。 |
+| `timeoutMs` | 高级 | 单档超时，默认 30000。 |
+| `order` / `searchOrder` | ▲▼ 箭头 | 每个能力的扁平阶梯；覆盖所有模式，优先于内置的按模式默认值。 |
+| `modeOrders` | 仅补丁 | 按能力、按模式的覆盖：`{ fetch: { deep: [...] } }`。只给需要特殊行为的模式用；未覆盖的模式回落到 `order`。如果 `order` 也为空，则使用内置的按模式默认值——这正是「零配置默认行为」的来源。 |
+| `enable` | 高级 | 允许注册的档位白名单。**空 = 全部**。用来让某个 provider 永远不被调用。 |
+| `providers` | 高级（cost）/ 补丁（其余） | 每档元数据覆盖：`cost`（`freeOnly` 读它）、`maxChars`、`requiresKey`、`kinds`、`note`。`quality` 只作文档，运行时不读。 |
+| `deepseekNeedContent` | 高级 | DeepSeek 搜索全文；无论开关都按次计费，响应从 ~5 KB 涨到 ~45 KB。 |
+| `anysearchTag` | 高级 | 垂直路由，例如 `code.doc`；改变查询语义，不改变排序。 |
+| `anysearchParams` | 仅补丁 | 额外 AnySearch 参数，原样透传。 |
 
-> **Save rewrites the config block.** The settings page writes the whole `config` mapping
-> through the host's `configForms` writer, which replaces the block wholesale — comments
-> placed inside a config block do not survive a save. That is why this table exists instead
-> of comment blocks in `cordis.patch.yml`. Comments elsewhere in the file are unaffected.
+> **保存会重写 config 块。** 设置页通过宿主的 `configForms` 写入器整体替换 `config` 映射，
+> 所以 config 块里的注释不会在保存后保留。这就是本表存在的原因；文件其它位置的注释不受影响。
 
-API keys are entered on the page and stored in the host credential store, which the legs
-consult **before** the environment. A key typed into the page works without a restart.
+API key 在设置页输入，存进宿主凭据库；各档位**先查凭据库、再查环境变量**，所以页面上
+输入的 key 无需重启即可生效。
 
-## Why one package and not four
-
-This started as four packages (policy / vendors / fetch chain / search chain) on a
-single-responsibility argument. In practice that produced four settings pages, one package
-that could not be configured at all (the shared policy has no `apply()`), and a lockstep
-upgrade problem. Modules are the right unit for internal separation; a package is the right
-unit for installing and configuring, and there should be exactly one.
-
-```
-config.js         one schema -> one settings page
-policy/           who is free, which mode wants which order, how much text
-providers/        the vendor HTTP legs
-chains/           ordering and fallback logic
-prompt.js         the one system-prompt section (when to reach for web_search)
-client.js         the settings page
-cordis.patch.yml  the default config, every field listed
-```
-
-## Tests
+## 测试
 
 ```bash
-npm install --no-audit --no-fund   # peer dependencies provide the test imports
+npm install --no-audit --no-fund   # peer 依赖提供测试所需的 import
 npm test
 ```
 
-There is no build step. `npm install` is still required in a fresh checkout because the
-tests import `@deepseek-ai/schemastery` and `@deepseek-ai/dsh-web`; they are declared as
-peer dependencies, not bundled.
-`test/client-render.test.js` runs the real `client.js` through `vm` with a fake
-`__ModuleLoader__`, a fake `primitives` shaped like the shipped one, and a fake context that
-expands `inject().hooks` the way the shell does. It exists because static checks missed five
-different ways this page disappeared — including `Button` being a `forwardRef` object rather
-than a callable function, which blanked the entire card.
+没有构建步骤，但干净 checkout 必须先 `npm install`：测试会 import
+`@deepseek-ai/schemastery` 与 `@deepseek-ai/dsh-web`，它们声明为 peer 依赖，不随包分发。
 
-One class of bug appeared three times and is now covered systematically: `settingsTextField`
-is a *string* field, so a spec that overrides only `parse` leaves the read direction broken
-and any non-string value (boolean, array, object) reads back as `''`. A test asserts the round
-trip for every registered field spec.
+`test/client-render.test.js` 用 `vm`、假 `__ModuleLoader__`、假 `primitives` 和按宿主方式
+展开 `inject().hooks` 的假上下文，运行真实的 `client.js`。静态检查曾漏掉五种「页面消失」的
+方式（包括 `Button` 是 `forwardRef` 对象而不是可调用函数），所以这里用真实渲染路径锁住。
 
-## Compatibility
+另有一类 bug 出现过三次：`settingsTextField` 是**字符串**字段，spec 只覆盖 `parse` 会让读取方向
+失效，任何非字符串值（boolean/array/object）都读回 `''`。现在对每个注册字段都做往返断言。
 
-- DSH `0.2.2-rc.x` (the `engines.dsh` range is `>=0.2.2-0 <0.3.0-0`).
-- Node.js 20+.
-- The plugin is independent of DeepSeek; DSH and the named providers are separate projects.
+## 为什么是一个包而不是四个
 
-## License
+最初按单一职责拆成四个包（策略 / 厂商 / 抓取链 / 搜索链）。实际结果是四个设置页、一个
+根本无法配置的包（共享策略没有 `apply()`），以及升级时必须同步改版本的锁步问题。模块是
+内部拆分的好单位；安装和配置的单位应当是包，而且只应该有一个。
 
-MIT. See [LICENSE](LICENSE).
+```
+config.js         一份 schema -> 一个设置页
+policy/           谁免费、哪个模式要什么顺序、正文取多少
+providers/        各厂商 HTTP 档
+chains/           排序与回退逻辑
+prompt.js         唯一一段系统提示（何时使用 web_search）
+client.js         设置页
+cordis.patch.yml  默认配置，每个字段都列出
+```
+
+## 兼容性
+
+- DSH `0.2.2-rc.x`（`engines.dsh` 为 `>=0.2.2-0 <0.3.0-0`）。
+- Node.js 20+。
+- 本插件与 DeepSeek 官方无关；DSH 与文中 provider 都是独立项目。
+
+## 许可
+
+MIT，见 [LICENSE](LICENSE)。
