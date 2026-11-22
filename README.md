@@ -69,7 +69,7 @@ web_fetch  ──▶ fetch-chain  ──▶ anysearch ──▶ tavily ──▶
 
 ## 安装
 
-要求：DSH `0.2.2-rc.x`、Node.js 20+，以及 `DEEPSEEK_API_KEY`、`ANYSEARCH_API_KEY`、
+要求：DSH `0.2.1-rc.x` / `0.2.2-rc.x`、Node.js 20+，以及 `DEEPSEEK_API_KEY`、`ANYSEARCH_API_KEY`、
 `TAVILY_API_KEY` 中**至少一个**。没有 key 的档仍会注册并自报不可用，所以一个 key 都没有
 时链里没有可调用的档。可选的普通 HTTP 档（`http`）需要另装 web-fetch 插件提供。
 
@@ -204,7 +204,7 @@ cordis.patch.yml  默认配置，每个字段都列出
 
 ## 兼容性
 
-- DSH `0.2.2-rc.x`（`engines.dsh` 为 `>=0.2.2-0 <0.3.0-0`）。
+- DSH `0.2.1-rc.x` / `0.2.2-rc.x`（`engines.dsh` 为 `>=0.2.1-0 <0.3.0-0`）。
 - Node.js 20+。
 - 本插件与 DeepSeek 官方无关；DSH 与文中 provider 都是独立项目。
 

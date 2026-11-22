@@ -78,7 +78,7 @@ another plugin registers that id.
 
 ## Install
 
-Requirements: DSH `0.2.2-rc.x`, Node.js 20+, and **at least one** of
+Requirements: DSH `0.2.1-rc.x` / `0.2.2-rc.x`, Node.js 20+, and **at least one** of
 `DEEPSEEK_API_KEY`, `ANYSEARCH_API_KEY`, `TAVILY_API_KEY`. A leg without its key is still
 registered but reports itself unavailable, so a chain with no keys has nothing to call.
 An optional plain-HTTP leg (`http`) can be supplied by a separate web-fetch plugin.
@@ -237,7 +237,7 @@ trip for every registered field spec.
 
 ## Compatibility
 
-- DSH `0.2.2-rc.x` (the `engines.dsh` range is `>=0.2.2-0 <0.3.0-0`).
+- DSH `0.2.1-rc.x` / `0.2.2-rc.x` (the `engines.dsh` range is `>=0.2.1-0 <0.3.0-0`).
 - Node.js 20+.
 - The plugin is independent of DeepSeek; DSH and the named providers are separate projects.
 

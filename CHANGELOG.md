@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.5] - 2026-11-22
+
+### Fixed
+
+- Host compatibility range now includes DSH `0.2.1-rc.x` as well as `0.2.2-rc.x`.
+  DSH 0.2.1 rejects `engines.dsh >=0.2.2-0`, so the previous manifest blocked
+  installation even though the plugin runs on 0.2.1.
+- README: state the supported DSH versions.
+
 ## [0.2.4] - 2026-11-16
 
 ### Fixed
