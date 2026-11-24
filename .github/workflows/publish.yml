@@ -1,0 +1,248 @@
+# 发布到 npmjs.com —— 走 OIDC trusted publishing，不用任何长期 token。
+#
+# 为什么不用 NPM_TOKEN（2026-11-24 事故）：
+#   本机 ~/.npmrc 里那把 classic token 在 11-22 还能发 0.5.5，11-24 起所有
+#   需要鉴权的端点一律 401；npm 官方文档现在的口径是「2025-11 起只支持
+#   granular token，legacy token 已移除」。更坑的是 npm CLI 在鉴权失败时会退回
+#   匿名 PUT，scoped 包因此报 E404（"could not be found or you do not have
+#   permission"）而不是 E401 —— 看起来像包不存在，实际是 token 死了。
+#
+# OIDC 用工作流自己的短时身份换发布凭据：没有 token 可泄露、没有 90 天轮换、
+#   也不会再出现「发版前才发现 token 过期」。
+#
+# ⚠ 2026-11-25 结论：这条路目前走不通，不是配置问题。
+#   GitHub 自 2026-07-15 起对新仓库强制 immutable subject claim：
+#     sub = repo:T-splines@95456842/dsh-web-fallback-chain@1459101202:ref:refs/tags/v0.5.6
+#   npm registry 拿这个 sub 去匹配 trusted publisher 记录时匹配不上，一律回
+#   {"message":"OIDC token exchange error - package not found"}（npm/cli#9969，
+#   仍 open，Priority 1）。本仓库建于 2026-11-15，必然是这个格式；
+#   实测 PUT /repos/.../actions/oidc/customization/sub {use_default:false,
+#   use_immutable_subject:false} 返回 201 但 GET 仍是 true —— GitHub 不让关。
+#   对照：2026-07-15 之前建的仓库（如 T-splines/AI_Reader）immutable=False，
+#   走旧格式，OIDC 可用。
+#
+#   所以 trusted publisher 配得再对也没用。当前发版走本机 token
+#   （Keychain npm-token-oss + scripts/npm-publish-keychain.sh）。
+#   npm 修好 #9969 之后，这个 workflow 不用改就能自动接管。
+#
+# 一次性人工前置（等 npm 修复后才需要）：
+#   npmjs.com → Packages → @magic6/dsh-web-fallback-chain → Settings → Trusted publishing
+#   Provider: GitHub Actions
+#   Organization or user: T-splines
+#   Repository:           dsh-web-fallback-chain
+#   Workflow filename:    publish.yml
+#   Environment:          （留空）
+#   ⚠ 配置建好后必须在 2 天内完成第一次成功发布，否则配置过期要重建。
+#
+# 发版流程：改 package.json version + CHANGELOG → commit → git tag vX.Y.Z → push tag。
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # ↓ 这一行是 OIDC 的全部秘密：允许工作流向 npm 证明「我是这个仓库的这个工作流」。
+  id-token: write
+
+jobs:
+  publish:
+    name: Test and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NPM_CONFIG_FUND: 'false'
+      NPM_CONFIG_AUDIT: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          # 让 npm 知道 registry；不要设置 token —— OIDC 路径要求完全无凭据。
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify npm CLI supports trusted publishing (>= 11.5.1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="$(npm --version)"; echo "npm ${v}"
+          node -e '
+            const [maj, min] = process.argv[1].split(".").map(Number);
+            if (maj < 11 || (maj === 11 && min < 5)) {
+              console.error(`npm >= 11.5.1 required for trusted publishing, found ${process.argv[1]}`);
+              process.exit(1);
+            }
+          ' "$v"
+
+      - name: Verify OIDC endpoint is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "::error::No OIDC token endpoint. Grant 'id-token: write' to this workflow."
+            exit 1
+          fi
+
+      - name: Full test suite
+        run: npm install --no-audit --no-fund && npm test
+
+      - name: Check version consistency (tag == package.json == CHANGELOG top)
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "${VERSION}" != "${TAG}" ]; then
+              echo "::error::package.json version ${VERSION} does not match tag ${GITHUB_REF_NAME}"
+              exit 1
+            fi
+          fi
+          TOP="$(grep -m1 '^## \[' CHANGELOG.md | sed -E 's/^## \[([^]]+)\].*/\1/')"
+          if [ "${TOP}" != "${VERSION}" ]; then
+            echo "::error::CHANGELOG top section (${TOP}) != package.json version (${VERSION})"
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "version ${VERSION} consistent"
+
+      - name: Probe the OIDC token exchange (fails loudly with the registry's own words)
+        shell: bash
+        env:
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc-oidc
+        run: |
+          set -euo pipefail
+          : > "${NPM_CONFIG_USERCONFIG}"
+          echo "registry=https://registry.npmjs.org/" >> "${NPM_CONFIG_USERCONFIG}"
+
+          # 直接打 npm 用来换 publishing token 的那个端点，把 registry 的原话打出来。
+          # 比反复猜「ENEEDAUTH 是 id-token 权限还是 trusted publisher 没配」快得多：
+          # 这个端点 404/401 => 包里没有匹配的 trusted publisher；200 + token => 配置是对的。
+          PKG="$(node -p "require('./package.json').name")"
+          # 用 npm 自己的转义规则（npa.escapedName），不要手搓 encodeURIComponent：
+          # npa 产出小写 %2f，手搓是大写 %2F。路由大小写敏感时这个差别会伪装成
+          # 「package not found」，把人骗去重配 trusted publisher。
+          ESCAPED="$(npm exec --yes --silent --package=npm-package-arg -- node -e 'import("npm-package-arg").then(({default:npa})=>console.log(npa(process.argv[1]).escapedName))' "${PKG}" 2>/dev/null \
+            || node -e 'console.log(process.argv[1].replace("/","%2f"))' "${PKG}")"
+          echo "package=${PKG} escaped=${ESCAPED}"
+
+          ID_TOKEN="$(curl -sS --fail "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).value')"
+          if [ -z "${ID_TOKEN}" ]; then
+            echo "::error::GitHub returned no OIDC id_token; check the 'id-token: write' permission."
+            exit 1
+          fi
+          # 只打 claims，不打 token 本身。同时抛成 annotation：
+          # GitHub 的 job log 要 admin 权限才能下载，annotation 才是外部可读的通道。
+          CLAIMS="$(node -e 'const p=JSON.parse(Buffer.from(process.argv[1].split(".")[1],"base64url").toString());console.log(JSON.stringify({aud:p.aud,sub:p.sub,repository:p.repository,ref:p.ref,job_workflow_ref:p.job_workflow_ref}))' "${ID_TOKEN}")"
+          echo "oidc claims: ${CLAIMS}"
+          echo "::warning::OIDC claims => ${CLAIMS}"
+          echo "::warning::npm 侧必须与此一致：Organization or user=T-splines, Repository=dsh-web-fallback-chain, Workflow filename=publish.yml, Environment=（留空）"
+
+          # sub 是 npm 匹配 trusted publisher 时真正比对的 claim。
+          # GitHub 自 2026-07-15 起对新仓库启用 immutable subject claim，
+          # 形状从 repo:OWNER/REPO:... 变成 repo:OWNER@ID/REPO@ID:...。
+          # npm registry 侧匹配不上就统一回 "package not found"（npm/cli#9969）。
+          SUB_CHECK="$(node -e '
+            const p = JSON.parse(Buffer.from(process.argv[1].split(".")[1],"base64url").toString());
+            const m = /^repo:([^/]+)\//.exec(p.sub || "");
+            const immutable = !!m && m[1].includes("@");
+            console.log(JSON.stringify({ sub: p.sub, immutable_subject: immutable }));
+          ' "${ID_TOKEN}")"
+          echo "sub claim: ${SUB_CHECK}"
+          echo "::warning::sub claim => ${SUB_CHECK}"
+
+          # 同时探另外两个包：如果它们 200 而本包 404，说明 trusted publisher 配到了
+          # 别的包上（或本包的 workflow 文件名/环境对不上），一眼就能区分。
+          # 含一个**确定没配** trusted publisher 的基线包（left-pad）：
+          #   基线也是 404 => 「package not found」就是「没配置」的标准文案，本包确实没配上
+          #   基线不是 404 => 我们的 404 另有含义，别急着让人重配
+          for OTHER in "@magic6/dsh-llm-resilience" "@magic6/dsh-web-fallback-chain" "@magic6/dsh-compaction-policy-engine" "left-pad"; do
+            ESC="${OTHER/@/%40}"
+            ESC="${ESC/\//%2f}"
+            CODE="$(curl -sS -o /tmp/x.json -w '%{http_code}' -X POST \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${ESC}" \
+              -H "Authorization: Bearer ${ID_TOKEN}" || true)"
+            echo "exchange probe ${OTHER} -> HTTP ${CODE} $(head -c 160 /tmp/x.json 2>/dev/null)"
+            echo "::warning::OIDC exchange ${OTHER} -> HTTP ${CODE} $(head -c 160 /tmp/x.json 2>/dev/null)"
+          done
+
+          BODY_FILE="$(mktemp)"
+          STATUS="$(curl -sS -o "${BODY_FILE}" -w '%{http_code}' -X POST \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${ESCAPED}" \
+            -H "Authorization: Bearer ${ID_TOKEN}" || true)"
+          echo "exchange HTTP ${STATUS}"
+          echo "exchange body: $(head -c 400 "${BODY_FILE}")"
+          if [ "${STATUS}" != "200" ]; then
+            # 说清 404 的两种可能，别让人去重配一个本来就对的设置：
+            # 本仓库建于 2026-11-15，GitHub 对新仓库强制 immutable subject claim，
+            # sub = repo:T-splines@95456842/dsh-web-fallback-chain@1459101202:ref:...
+            # registry 侧匹配不上就统一回 "package not found"（npm/cli#9969，open，P1）。
+            echo "::error::OIDC token exchange failed (HTTP ${STATUS}). npm says: $(head -c 300 "${BODY_FILE}") — 两种可能：① npm 侧没有 trusted publisher 记录；② 有记录但 sub claim 是 immutable 格式（本仓库建于 2026-07-15 之后，必然是这种），npm registry 匹配不上，见 npm/cli#9969。看上面 "sub claim => " 那行的 immutable_subject 字段即可区分。"
+            exit 1
+          fi
+          node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log("exchange ok, token fields:", Object.keys(b).join(","))' "${BODY_FILE}"
+
+      - name: Publish to npmjs (OIDC trusted publishing)
+        shell: bash
+        env:
+          # setup-node 会注入 NODE_AUTH_TOKEN；清掉它，强制 npm 走 OIDC。
+          NODE_AUTH_TOKEN: ''
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc-oidc
+        run: |
+          set -euo pipefail
+          # 干净的 userconfig：只有 registry，没有任何凭据。
+          : > "${NPM_CONFIG_USERCONFIG}"
+          echo "registry=https://registry.npmjs.org/" >> "${NPM_CONFIG_USERCONFIG}"
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NODE_AUTH_TOKEN must not be set; trusted publishing requires OIDC."
+            exit 1
+          fi
+
+          PKG="$(node -p "require('./package.json').name")"
+          if npm view "${PKG}@${VERSION}" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
+            echo "${PKG}@${VERSION} already exists on npmjs; skipping."
+            echo "### npmjs: version already exists" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          # 失败时必须看得到 npm 的原话：403/404/ENEEDAUTH 对应完全不同的修法。
+          set +e
+          npm publish --access public --registry=https://registry.npmjs.org/ --loglevel verbose 2>&1 | tee /tmp/publish.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "${STATUS}" -ne 0 ]; then
+            echo "::group::npm publish diagnostics"
+            echo "--- npm / node ---"
+            npm --version; node --version
+            echo "--- offline OIDC env present? ---"
+            for v in ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN NODE_AUTH_TOKEN NPM_TOKEN; do
+              val="${!v:-}"
+              if [ -n "${val}" ]; then echo "${v}: set (length ${#val})"; else echo "${v}: empty"; fi
+            done
+            echo "--- effective npm config (auth fields only) ---"
+            npm config list 2>&1 | grep -iE 'registry|auth|token|userconfig' || true
+            echo "--- registry view of the package ---"
+            npm view "${PKG}" version --registry=https://registry.npmjs.org/ 2>&1 | tail -3
+            echo "--- auth-ish lines from the publish log ---"
+            grep -iE 'e40[0-9]|e403|eneedauth|otp|oidc|trusted|publish|not permitted|forbidden' /tmp/publish.log | tail -25 || true
+            echo "::endgroup::"
+            # 关键一行抛成 annotation：GitHub 的 log 下载要 admin 权限，但
+            # check-run 的 annotation 是公开可读的 —— 这是唯一能从外部看到
+            # 「npm 到底说了什么」的通道（2026-11-24 排障时踩到过）。
+            KEY="$(grep -iE 'npm error|e40[0-9]|eneedauth|forbidden|not permitted' /tmp/publish.log | head -3 | tr '\n' ' ' | cut -c1-350)"
+            echo "::error::npm publish failed (exit ${STATUS}): ${KEY:-no diagnostic line matched}"
+            echo "### ❌ Publish failed with exit ${STATUS}" >> "${GITHUB_STEP_SUMMARY}"
+            exit "${STATUS}"
+          fi
+
+          echo "### ✅ Published ${PKG}@${VERSION} to npmjs (OIDC, no token)" >> "${GITHUB_STEP_SUMMARY}"
