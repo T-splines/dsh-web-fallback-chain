@@ -22,3 +22,18 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm install --no-audit --no-fund
       - run: npm test
+
+  # Windows 必须单独跑一遍：2026-11-25 在真实 Win11 上跑测试时才暴露出
+  # 「断言写死 POSIX 路径前缀、产品代码用 path.join」这类只在 Windows 挂的
+  # 测试。CI 只有 ubuntu 时这永远不会被发现，而用户就在 Windows 上用这些插件。
+  # 只跑一个 node 版本：平台差异是这里要测的东西，node 版本已由上面覆盖。
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm test
