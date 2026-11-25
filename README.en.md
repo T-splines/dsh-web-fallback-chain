@@ -235,11 +235,48 @@ is a *string* field, so a spec that overrides only `parse` leaves the read direc
 and any non-string value (boolean, array, object) reads back as `''`. A test asserts the round
 trip for every registered field spec.
 
+## Tested platforms
+
+The suite is run, and passes, on every platform listed here — this is measured, not
+assumed:
+
+| Platform | Version | Result | How |
+|:--|:--|:--|:--|
+| macOS | 26.6.2 arm64 | ✅ 162/162 | full `npm test` on the machine |
+| Windows | 11 22631 x64 | ✅ 162/162 | full `npm test` on real hardware |
+| Linux | ubuntu-latest x64 | ✅ 162/162 | GitHub Actions (Node 20 / 22) |
+
+The Windows row was added on 2026-11-25, when CI ran `ubuntu-latest` only and most
+users were on Windows. The first real Windows run passed; the CI job exists so it stays that way.
+
+> Only platforms the suite has actually run on are listed. Absence here does not
+> mean "unsupported" — it means nobody has verified it yet. If you ran the suite
+> somewhere else, a PR adding the row is welcome.
+
 ## Compatibility
 
 - DSH `0.2.1-rc.x` / `0.2.2-rc.x` (the `engines.dsh` range is `>=0.2.1-0 <0.3.0-0`).
 - Node.js 20+.
 - The plugin is independent of DeepSeek; DSH and the named providers are separate projects.
+
+## Reporting a problem
+
+Open an issue — no need to work out first whether it is your configuration:
+
+- 🐞 **[Bug report](https://github.com/T-splines/dsh-web-fallback-chain/issues/new?template=bug_report.yml)**
+  — wrong behaviour, a crash, a chain that should have fallen back and did not, a
+  breaker that never recovers.
+- ❓ **[Config question](https://github.com/T-splines/dsh-web-fallback-chain/issues/new?template=config_question.yml)**
+  — it runs, but does not do what you configured.
+
+Four details usually decide the case, so include them if you can:
+
+1. plugin version and DSH version;
+2. operating system (providers differ a lot, and so do platforms);
+3. the exact `code` and `message` — not a paraphrase;
+4. the HTTP status and body the failing provider returned.
+
+Security issues: please do not open a public issue — use [SECURITY.md](SECURITY.md).
 
 ## License
 

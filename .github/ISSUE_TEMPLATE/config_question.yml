@@ -1,0 +1,53 @@
+name: Config question
+description: It runs, but the behaviour is not what you configured — classification, budget, breaker
+title: "[config] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most "it did not do what I configured" reports come down to one of three
+        things: which code the target actually returned, how the retry budget is
+        counted, or whether the target is locked. This form asks for exactly those.
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Your `web-fallback` config
+      description: The whole block from your profile's `cordis.patch.yml`. Remove credentials.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected the chain to do
+      placeholder: "use jina first, fall back to tavily when it is rate-limited"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What it did instead
+      description: Include the provider responses and which chain it took.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      placeholder: "0.2.5"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: OS and DSH version
+      placeholder: "Windows 11, DSH 0.2.2-rc.1"
+    validations:
+      required: true

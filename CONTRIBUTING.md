@@ -26,3 +26,13 @@ declared peer packages.
 - Do not add runtime dependencies without discussing it first: the plugin is meant to
   stay install-free inside a DSH profile.
 - Update `CHANGELOG.md` for user-visible changes.
+
+## Reporting a bug you found
+
+Open an issue on this repository rather than keeping it in a chat log — the
+[bug report template](.github/ISSUE_TEMPLATE/bug_report.yml) asks for the four
+details that decide most cases. A report with the exact `code`, the platform, the
+configuration block and the state file usually gets diagnosed the same day.
+
+If you are sending a fix instead: one logical change per commit, a regression test
+that fails without it, and a `CHANGELOG.md` entry.
