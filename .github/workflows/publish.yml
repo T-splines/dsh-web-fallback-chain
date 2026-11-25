@@ -114,7 +114,25 @@ jobs:
           echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
           echo "version ${VERSION} consistent"
 
+      - name: Skip when this version is already on npmjs
+        id: exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').name")"
+          # 发版时先用本机 token 发了、再推 tag 触发这里，是最常见的路径。
+          # 那种情况下 OIDC 步骤必然失败（见文首关于 npm/cli#9969 的说明），
+          # 但「这个版本已经发布了」不是失败 —— 直接跳过，别把发版记录染红。
+          if npm view "${PKG}@${VERSION}" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
+            echo "already=true" >> "${GITHUB_OUTPUT}"
+            echo "### npmjs 上已有 ${PKG}@${VERSION}，本次无需发布" >> "${GITHUB_STEP_SUMMARY}"
+            echo "${PKG}@${VERSION} already published; nothing to do."
+          else
+            echo "already=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Probe the OIDC token exchange (fails loudly with the registry's own words)
+        if: steps.exists.outputs.already != 'true'
         shell: bash
         env:
           NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc-oidc
@@ -192,6 +210,7 @@ jobs:
           node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log("exchange ok, token fields:", Object.keys(b).join(","))' "${BODY_FILE}"
 
       - name: Publish to npmjs (OIDC trusted publishing)
+        if: steps.exists.outputs.already != 'true'
         shell: bash
         env:
           # setup-node 会注入 NODE_AUTH_TOKEN；清掉它，强制 npm 走 OIDC。
