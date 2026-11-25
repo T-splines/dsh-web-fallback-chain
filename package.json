@@ -1,6 +1,6 @@
 {
   "name": "@magic6/dsh-web-fallback-chain",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Ranked, cost-aware web search and fetch fallback chains for DeepSeek Harness: measured provider ranking, free-only mode, and one settings page.",
   "type": "module",
   "main": "src/index.js",

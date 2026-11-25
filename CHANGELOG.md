@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.6] - 2026-11-25
+
+### Documentation
+
+- README (both languages) now carries a **tested platforms** table (macOS, Windows,
+  Linux — each with the actual pass count) and a **reporting a problem** section.
+- `.github/ISSUE_TEMPLATE/` added: `bug_report.yml` (asks for the provider's HTTP
+  status and body) and `config_question.yml`.
+
 ## [0.2.5] - 2026-11-22
 
 ### Fixed
@@ -12,7 +21,6 @@ All notable changes to this project are documented here. The format follows
   DSH 0.2.1 rejects `engines.dsh >=0.2.2-0`, so the previous manifest blocked
   installation even though the plugin runs on 0.2.1.
 - README: state the supported DSH versions.
-
 ## [0.2.4] - 2026-11-16
 
 ### Fixed
